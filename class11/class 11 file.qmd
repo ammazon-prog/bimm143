@@ -1,0 +1,238 @@
+---
+title: "Class 11: Structural Bioinformatics pt2"
+Author: "Ashley Mazon (PID:A17478903)"
+format: pdf
+---
+
+## Alphafold Data Base (AFDB)
+
+The EBI maintains the largest database of AlphaFold structure predictoin models at: https://alphafold.ebi.ac.uk/ 
+
+From last class (before Halloween) we saw that the PDB had 244,290 (Oct 2025)
+
+The total number of protein sequences in UniProtKB is 199,579,901
+
+
+> **Key Point**: this is a tiny fraction if sequence space that has structural coverage (0.12%)
+
+```{r}
+244290/199579901 *100
+```
+
+AFDB is attemping to address this gap 
+
+There are two "Quality Scores" from AlphaFold one for residues (i.e each amino acid) called **pLDDT** score. The other **PAE** score measures the condience in the relative position of two residues (i.e a score for every other pair of residues)
+
+## Generating your own structure predictions 
+
+Figure of 5 generated HIV-PR models 
+
+![](Superimposed.png)
+
+And the top ranked model colored by chain
+
+![](HICPRDIMER_23119_HICPRDIMER_23119.png)
+
+
+
+pLDDT score for model 1 
+
+![](HICPRDIMER_23119_model5.png)
+
+
+and model 5 
+![](HICPRDIMER_23119_model5.png)
+
+
+# Custom analysis of resulting models in R 
+
+
+Read key result files into R 
+
+```{r}
+results_dir <- "hivpr_dimer_23119"
+```
+
+```{r}
+pdb_files <- list.files(path=results_dir,
+                        pattern="*.pdb",
+                        full.names = TRUE)
+```
+
+```{r}
+basename(pdb_files)
+```
+
+
+```{r}
+library (bio3d)
+library (msa)
+pdbs <- pdbaln(pdb_files, fit=TRUE, exefile="msa")
+pdbs
+```
+
+```{r}
+rd <- rmsd(pdbs, fit=T)
+
+range(rd)
+```
+
+
+```{r}
+library(pheatmap)
+
+colnames(rd) <- paste0("m",1:5)
+rownames(rd) <- paste0("m",1:5)
+pheatmap(rd)
+```
+
+
+
+
+
+
+
+
+Read a reference PDB structure 
+
+```{r}
+pdb <- read.pdb("1hsg")
+```
+
+```{r}
+plotb3(pdbs$b[1,], typ="l", lwd=2, sse=pdb)
+points(pdbs$b[2,], typ="l", col="red")
+points(pdbs$b[3,], typ="l", col="blue")
+points(pdbs$b[4,], typ="l", col="darkgreen")
+points(pdbs$b[5,], typ="l", col="orange")
+abline(v=100, col="gray")
+```
+
+
+```{r}
+core <- core.find(pdbs)
+core.inds <- print(core, vol=0.5)
+
+```
+
+
+
+```{r}
+xyz <- pdbfit(pdbs, core.inds, outpath="corefit_structures")
+```
+
+
+Open corefit_structures/ in Mol* and color by the **Atom Property** of **Uncertainty/Disorder**
+
+![](uncertaintydisorder.png)
+
+```{r}
+rf <- rmsf(xyz)
+
+plotb3(rf, sse=pdb)
+abline(v=100, col="gray", ylab="RMSF")
+```
+
+
+## Predicted Alignment Error for Domains 
+
+
+
+```{r}
+library(jsonlite)
+
+# Listing of all PAE JSON files
+pae_files <- list.files(path=results_dir,
+                        pattern=".*model.*\\.json",
+                        full.names = TRUE)
+```
+
+```{r}
+pae1 <- read_json(pae_files[1],simplifyVector = TRUE)
+pae5 <- read_json(pae_files[5],simplifyVector = TRUE)
+
+attributes(pae1)
+```
+
+```{r}
+head(pae1$plddt) 
+```
+```{r}
+pae1$max_pae
+pae5$max_pae
+```
+
+
+plot the N by N 
+
+```{r}
+plot.dmat(pae1$pae, 
+          xlab="Residue Position (i)",
+          ylab="Residue Position (j)")
+```
+
+```{r}
+plot.dmat(pae5$pae, 
+          xlab="Residue Position (i)",
+          ylab="Residue Position (j)",
+          grid.col = "black",
+          zlim=c(0,30))
+```
+
+```{r}
+plot.dmat(pae1$pae, 
+          xlab="Residue Position (i)",
+          ylab="Residue Position (j)",
+          grid.col = "black",
+          zlim=c(0,30))
+```
+
+
+
+
+##Residue conservation from alignment file 
+
+find the large AlphaFold alignment file 
+
+```{r}
+aln_file <- list.files(path=results_dir,
+                       pattern=".a3m$",
+                        full.names = TRUE)
+aln_file
+```
+
+
+```{r}
+aln <- read.fasta(aln_file[1], to.upper = TRUE)
+
+```
+
+how many seqeunces are in this file 
+
+```{r}
+dim(aln$ali)
+```
+
+
+We can score residue conservation in the alignment with the conserv() function.
+
+```{r}
+sim <- conserv(aln)
+
+plotb3(sim[1:99],
+       ylab="Conservation Score")
+```
+
+
+```{r}
+con <- consensus(aln, cutoff = 0.9)
+con$seq
+```
+
+
+```{r}
+m1.pdb <- read.pdb(pdb_files[1])
+occ <- vec2resno(c(sim[1:99], sim[1:99]), m1.pdb$atom$resno)
+write.pdb(m1.pdb, o=occ, file="m1_conserv.pdb")
+```
+
