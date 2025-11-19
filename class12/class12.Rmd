@@ -1,0 +1,43 @@
+---
+title: 'Week 12: DeSeq Analysis'
+author: 'Ashley Mazon (PID: A17478903)'
+date: "2025-11-06"
+output: html_document
+---
+
+
+This week we are looking at differential expression analysis. 
+
+The data for this hands-on session comes from a publiched RNA seq- experiment where airway smooth muscle cells were treated with dexamethasone, a synthetic glucocorticoid steroid with anti-inflammatory effects (Himes et al. 2014) 
+
+
+## Import/Read the daya from Himes et al. 
+
+```{r}
+library(BiocManager)
+library(DESeq2)
+```
+
+```{r}
+counts <- read.csv("airway_scaledcounts.csv", row.names=1 )
+head(counts)
+```
+
+```{r}
+metadata <-  read.csv("airway_metadata.csv")
+head(metadata)
+```
+
+> Q1. How many genes are in this dataset? 
+
+There are `r nrow(counts)` genes in this data set 
+
+> Q2. How many ‘control’ cell lines do we have?
+
+```{r}
+n.control <- sum(metadata$dex == "control")
+```
+There are `r n.control` control cell lines 
+
+
+
